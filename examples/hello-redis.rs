@@ -10,5 +10,3 @@ pub async fn main() -> Result<()> {
 
     Ok(())
 }
-
-
