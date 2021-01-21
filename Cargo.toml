@@ -1,0 +1,10 @@
+[package]
+name = "mini-redis"
+version = "0.1.0"
+authors = ["Rohan Mishra <rohanmishra2017@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+mini-redis = "0.4"
+
