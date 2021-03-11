@@ -4,8 +4,19 @@ use std::sync::{Arc, Mutex};
 use bytes::Bytes;
 use mini_redis::{Connection, Frame};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{mpsc};
 
 type Db = Arc<Mutex<HashMap<String, Bytes>>>;
+
+enum Command {
+    Get {
+        key: String, 
+    },
+    Set {
+        key: String,
+        value: Bytes,
+    },
+}
 
 async fn process(socket: TcpStream) {
     use mini_redis::Command::{self, Get, Set};
@@ -39,10 +50,50 @@ async fn process(socket: TcpStream) {
 
 #[tokio::main]
 async fn main() {
+    let tx2 = tx.clone();
+
+    // Spawn two tasks, one gets a key, the other sets a key
+    let t1 = tokio::spawn(async move {
+        let cmd = Command::Get {
+            key: "hello".to_string(),
+        };
+
+        tx.send(cmd).await.unwrap();
+    });
+
+    let t2 = tokio::spawn(async move {
+        let cmd = Command::Set {
+            key: "foo".to_string(),
+            val: "bar".into(),
+        };
+
+        tx2.send(cmd).await.unwrap();
+    });
+
+    use mini_redis::client;
+
+    let manager = tokio::spawn(async move {
+        let mut client = client::connect("127.0.0.1:6379").await.unwrap();
+
+        while let Some(cmd) = rx.recv.await {
+            use Command::*;
+
+            match cmd {
+                Get { key } => {
+                    client.get(&key).await;
+                },
+                Set { key, val} {
+                    client.set(&key).await;
+                }
+            }
+        };
+
+    });
+
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
     println("Listening...");
-
+    
     let db = Arc::new(Mutex::new(HashMap::new()));
 
     loop {
@@ -54,4 +105,8 @@ async fn main() {
             process(socket, db).await;
         });
     }
+
+    t1.await.unwrap();
+    t2.await.unwrap();
+    manager.await.unwrap();
 }
